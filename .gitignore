@@ -1,0 +1,5 @@
+/bookmark-bridge
+*.exe
+*.test
+*.out
+/dist/
