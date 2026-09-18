@@ -8,7 +8,8 @@ Firefox, and Safari all still produce when you hit "Export Bookmarks", and
 it's miserable to script against.
 
 `bookmark-bridge` reads that format and turns it into plain, nested JSON so
-you can grep it, diff it, or feed it into something else.
+you can grep it, diff it, or feed it into something else. It also goes the
+other way, turning that JSON back into a Netscape file a browser can import.
 
 ## Usage
 
@@ -37,6 +38,12 @@ commands above behave identically. Mixing the two is fine too:
 ./bookmark-bridge -in bookmarks.html > bookmarks.json
 ```
 
+Convert back the other way with `-from json -to netscape`:
+
+```
+./bookmark-bridge -from json -to netscape -in bookmarks.json -out bookmarks.html
+```
+
 ## Output shape
 
 Each folder becomes a JSON object with its own bookmarks and sub-folders:
@@ -63,10 +70,11 @@ Each folder becomes a JSON object with its own bookmarks and sub-folders:
 
 ## Current limitations
 
-Only `netscape -> json` is implemented right now (`-from` and `-to` exist as
-flags for the direction that's coming). There's no support yet for
-Chrome/Firefox's internal JSON bookmark formats, which differ from the JSON
-shape produced here.
+The JSON -> Netscape direction only round-trips what the JSON shape above can
+hold, so favicons and folder-level ADD_DATE/LAST_MODIFIED metadata (which
+Netscape files can carry but this tool doesn't parse into JSON) are dropped.
+There's also no support yet for Chrome/Firefox's internal JSON bookmark
+formats, which differ from the JSON shape produced here.
 
 ## License
 

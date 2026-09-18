@@ -86,3 +86,62 @@ func ParseNetscape(r io.Reader) (*Folder, error) {
 	}
 	return root, nil
 }
+
+const netscapeHeader = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<!-- This is an automatically generated file.
+     It will be read and overwritten.
+     DO NOT EDIT! -->
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>
+`
+
+// WriteNetscape writes root back out in Netscape Bookmark File format,
+// the same dialect ParseNetscape reads. The round trip isn't lossless:
+// AddedAt survives (as ADD_DATE, re-encoded to a Unix timestamp), but
+// there's nowhere in our JSON shape yet to carry favicons or folder
+// timestamps, so those are simply absent on the way back out.
+func WriteNetscape(w io.Writer, root *Folder) error {
+	bw := bufio.NewWriter(w)
+	if _, err := bw.WriteString(netscapeHeader); err != nil {
+		return err
+	}
+	if err := writeNetscapeFolder(bw, root, 0); err != nil {
+		return err
+	}
+	return bw.Flush()
+}
+
+func writeNetscapeFolder(w *bufio.Writer, f *Folder, depth int) error {
+	indent := strings.Repeat("    ", depth)
+	if _, err := fmt.Fprintf(w, "%s<DL><p>\n", indent); err != nil {
+		return err
+	}
+	childIndent := indent + "    "
+
+	for _, b := range f.Bookmarks {
+		attrs := fmt.Sprintf(` HREF="%s"`, html.EscapeString(b.URL))
+		if b.AddedAt != "" {
+			if t, err := time.Parse(time.RFC3339, b.AddedAt); err == nil {
+				attrs += fmt.Sprintf(` ADD_DATE="%d"`, t.Unix())
+			}
+		}
+		if _, err := fmt.Fprintf(w, "%s<DT><A%s>%s</A>\n", childIndent, attrs, html.EscapeString(b.Title)); err != nil {
+			return err
+		}
+	}
+
+	for _, sub := range f.Folders {
+		if _, err := fmt.Fprintf(w, "%s<DT><H3>%s</H3>\n", childIndent, html.EscapeString(sub.Title)); err != nil {
+			return err
+		}
+		if err := writeNetscapeFolder(w, sub, depth+1); err != nil {
+			return err
+		}
+	}
+
+	if _, err := fmt.Fprintf(w, "%s</DL><p>\n", indent); err != nil {
+		return err
+	}
+	return nil
+}

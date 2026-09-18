@@ -9,8 +9,8 @@ import (
 )
 
 func main() {
-	from := flag.String("from", "netscape", "input format (netscape)")
-	to := flag.String("to", "json", "output format (json)")
+	from := flag.String("from", "netscape", "input format (netscape or json)")
+	to := flag.String("to", "json", "output format (json or netscape)")
 	in := flag.String("in", "-", "input file, or - for stdin")
 	out := flag.String("out", "-", "output file, or - for stdout")
 	flag.Parse()
@@ -22,10 +22,6 @@ func main() {
 }
 
 func run(from, to, in, out string) error {
-	if from != "netscape" || to != "json" {
-		return fmt.Errorf("unsupported conversion %q -> %q (only netscape -> json is implemented so far)", from, to)
-	}
-
 	r, closeIn, err := openInput(in)
 	if err != nil {
 		return err
@@ -38,15 +34,35 @@ func run(from, to, in, out string) error {
 	}
 	defer closeOut()
 
-	root, err := ParseNetscape(r)
-	if err != nil {
-		return fmt.Errorf("parsing bookmarks: %w", err)
+	var root *Folder
+	switch from {
+	case "netscape":
+		root, err = ParseNetscape(r)
+		if err != nil {
+			return fmt.Errorf("parsing bookmarks: %w", err)
+		}
+	case "json":
+		root = &Folder{}
+		if err := json.NewDecoder(r).Decode(root); err != nil {
+			return fmt.Errorf("parsing json: %w", err)
+		}
+	default:
+		return fmt.Errorf("unsupported input format %q (want netscape or json)", from)
 	}
 
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(root); err != nil {
-		return fmt.Errorf("writing json: %w", err)
+	switch to {
+	case "json":
+		enc := json.NewEncoder(w)
+		enc.SetIndent("", "  ")
+		if err := enc.Encode(root); err != nil {
+			return fmt.Errorf("writing json: %w", err)
+		}
+	case "netscape":
+		if err := WriteNetscape(w, root); err != nil {
+			return fmt.Errorf("writing bookmarks: %w", err)
+		}
+	default:
+		return fmt.Errorf("unsupported output format %q (want netscape or json)", to)
 	}
 	return nil
 }
